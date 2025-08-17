@@ -1,0 +1,68 @@
+name: Issues Event Debug
+
+on:
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled, assigned, unassigned, milestoned, demilestoned, pinned, unpinned, transferred, locked, unlocked]
+
+jobs:
+  print-event:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - name: Dump full event payload
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.info('Full event payload:')
+            core.info(JSON.stringify(context.payload, null, 2))
+
+      - name: Summarize important fields
+        id: summarize
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const p = context.payload
+            const issue = p.issue || {}
+            const summary = {
+              event_name: context.eventName,
+              action: p.action,
+              repo: `${context.repo.owner}/${context.repo.repo}`,
+              issue_number: issue.number,
+              issue_title: issue.title,
+              issue_state: issue.state,
+              issue_url: issue.html_url,
+              actor: context.actor,
+              label: p.label?.name || null,
+              assignee: p.assignee?.login || null,
+              created_at: issue.created_at,
+              updated_at: issue.updated_at
+            }
+            core.setOutput('summary', JSON.stringify(summary, null, 2))
+            core.info('Event summary:\n' + JSON.stringify(summary, null, 2))
+
+      - name: Expose selected fields as step outputs
+        id: expose
+        run: |
+          {
+            echo "action=${{ github.event.action }}";
+            echo "issue_number=${{ github.event.issue.number }}";
+            echo "issue_title<<EOF";
+            echo "${{ github.event.issue.title }}";
+            echo "EOF";
+            echo "issue_state=${{ github.event.issue.state }}";
+            echo "label=${{ github.event.label.name || '' }}";
+            echo "assignee=${{ github.event.assignee.login || '' }}";
+            echo "issue_url=${{ github.event.issue.html_url }}";
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Print selected outputs
+        run: |
+          echo "Action: ${{ steps.expose.outputs.action }}"
+          echo "Issue #: ${{ steps.expose.outputs.issue_number }}"
+          echo "Title: ${{ steps.expose.outputs.issue_title }}"
+          echo "State: ${{ steps.expose.outputs.issue_state }}"
+          echo "Label: ${{ steps.expose.outputs.label }}"
+          echo "Assignee: ${{ steps.expose.outputs.assignee }}"
+          echo "URL: ${{ steps.expose.outputs.issue_url }}"
